@@ -4,7 +4,7 @@ A 3D-printable cradle that clamps a Mac mini (127 × 127 × 50 mm) to a 1" (25.4
 - **Tube velcroed down:** the Mac sits upside-down on top of it, centered, with its vented foot facing up and open.
 - **Vertical tube:** the Mac hangs front-up, with the back-panel cables pointing down.
 
-The clamp grips only the tube's two side faces, so nothing wraps around the velcro face. A small lip on the fixed side hooks 2.5 mm over one edge. Four parts, all printed in PETG, with no metal hardware and no supports.
+The clamp grips only the tube's two side faces, so nothing wraps around the velcro face. A small lip on the fixed side hooks 2.5 mm over one edge. Four zip-tie eyes at the corners, beside the tube, let you tie the cradle down as well; they take standard 4.8 mm ties. Four parts, all printed in PETG, with no metal hardware and no supports.
 
 ![Sitting on the velcroed tube](out/macmini/horizontal_tube.png)
 
@@ -29,6 +29,7 @@ Or open the ready-made plates in `out/macmini/plates/`. Each object's name lists
 2. Drop the nut into its slot from the back of the cradle, sliding it down to the middle.
 3. Thread screw 4a in from the side, through the wall and the nut, until its tip comes out on the inside. Snap the pad onto the tip.
 4. Back the screw off. Hook the fixed jaw's lip under one edge of the tube, lower the cradle onto it, and tighten the screw until the pad grips the tube.
+5. Optionally, run zip ties through the corner eyes to whatever the tube is mounted on.
 
 ## Rebuild from source
 

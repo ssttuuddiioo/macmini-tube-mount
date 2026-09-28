@@ -51,6 +51,8 @@ LIP_GAP = 0.2                     # lip clearance above the velcro face
 AB_WALL = 4.0                     # abutment walls either side of the nut slot
 TRAVEL = 3.0                      # gap between pad and abutment when clamped
 CHAMF = 2.0                       # stress-corner chamfers
+EYE = (10.0, 14.0, 8.0)           # zip-tie eye tabs at the roof corners: reach out from the wall, length, height
+ZIP_W, ZIP_L = 2.5, 5.2           # zip-tie slot width and straight length (takes 4.8 mm ties); ends pointed at 45 deg
 # threads: 12 mm, 2 mm pitch, printable buttress-style triangle (lower flank < 45 deg)
 PITCH, R_MAJ, R_CORE, R_BASE = 2.0, 6.0, 4.7, 4.5
 LOW_TAN, UP_TAN = 0.955, math.tan(math.radians(15))   # dr/dz of lower flank, dz/dr of upper
@@ -315,6 +317,21 @@ def build_cradle():
     hs = NUT[2] / 2 + FIT
     cut(prism("nut_slot", [(SLOT_X[0], Z_S - hs), (SLOT_X[1], Z_S - hs), (SLOT_X[1], Z_S + hs), (SLOT_X[0], Z_S + hs)],
               "Y", -NUT[1] / 2 - FIT, Y_BACK + 1))      # open at the back: the nut drops in from there
+    # zip-tie eyes at the four roof corners. Front ones start on the print bed; back ones get a
+    # 45-degree underside. Slots run along Z with pointed ends toward +/-Y, so nothing bridges.
+    out, ln, ht = EYE
+    a, b = ZIP_W / 2, ZIP_L / 2
+    for sx in (1, -1):
+        for front in (True, False):
+            y0, y1 = (Y_FRONT, Y_FRONT + ln) if front else (Y_BACK - ln, Y_BACK)
+            xw, xo = sx * (OX - 0.4), sx * (OX + out)
+            pts = [(xw, y0), (xo, y0), (xo, y1), (xw, y1)] if front else \
+                  [(xw, y0 - out - 0.4), (xo, y0), (xo, y1), (xw, y1)]
+            tag = f"{'front' if front else 'back'}{sx:+d}"
+            add(prism(f"eye_{tag}", pts, "Z", Z_TOP - ht, Z_TOP))
+            xc, yc = sx * (OX + out / 2 + 0.5), (y0 + y1) / 2
+            hexa = [(xc - a, yc - b), (xc, yc - b - a), (xc + a, yc - b), (xc + a, yc + b), (xc, yc + b + a), (xc - a, yc + b)]
+            cut(prism(f"zip_{tag}", hexa, "Z", Z_TOP - ht - 1, Z_TOP + 1))
     r = R_CLEAR                                          # teardrop: 45-degree point toward +Y (print up)
     tear = [(r * math.sqrt(2), Z_S)] + [(r * math.cos(a), Z_S + r * math.sin(a))
                                         for a in (math.radians(45 + 10 * i) for i in range(28))]
@@ -404,8 +421,8 @@ PLATES = {
     ],
     "plate2_parts": [
         ("cradle", "cradle - 4 walls 35% infill, brim", (15, 15)),
-        ("screw_4a", "screw_4a - 100% infill", (175, 15)),
-        ("nut", "nut - 100% infill", (175, 60)),
+        ("screw_4a", "screw_4a - 100% infill", (190, 15)),
+        ("nut", "nut - 100% infill", (190, 60)),
         ("pad", "pad - 100% infill", (15, 125)),
     ],
 }

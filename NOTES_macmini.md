@@ -35,6 +35,7 @@ Four printed parts: **cradle** (orange, with the tube clamp built in), **nut** (
 - Screw 4a: 26 × 10 mm knurled wheel (24 V-knurls), a 45° root cone, 24 mm of thread, then a neck and a 9 mm snap collar. The collar is small enough to pass through the nut.
 
 **Cradle**
+- Zip-tie eyes: four 10 × 14 × 8 mm tabs at the roof corners, sticking out sideways. Each has a 2.5 × 5.2 mm slot (for 4.8 mm ties) running along Z, so a tie can go past the tube to whatever it's velcroed to. Front tabs start on the print bed; back tabs have a 45° underside. The slots have pointed ends, so nothing bridges. The cradle grows from 136 to 156 mm wide.
 - Floor cutout: a 112 mm circle under the foot, opened straight back to the rear edge (no ceiling when printed front-face-down).
 - Power notch: 30 × 30 mm at rear-left (-X, +Y, seen from the front).
 - Retention:
@@ -67,4 +68,5 @@ Four printed parts: **cradle** (orange, with the tube clamp built in), **nut** (
   - Top edge radius small enough for the 3.5 mm hook to catch.
 - No elephant-foot chamfer on the cradle's front (bed) edges or the pad's face edges.
 - Strength under load hasn't been simulated.
+- The zip-tie slots take 4.8 mm ties. Heavier ties (7.6 mm) won't fit; widen `ZIP_L` if needed.
 - The tongue-slot tops are 2 mm bridges. These are the only overhangs the checker reports, and they're within the 20 mm limit.
