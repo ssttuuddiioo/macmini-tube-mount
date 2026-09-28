@@ -1,16 +1,16 @@
 """3D-printable Mac mini enclosure that clamps to a 1" square tube (vertical or horizontal).
 
 Units: 1 Blender unit = 1 mm. All parts PETG on a Bambu P1S.
-Parts: cradle (+ plate), clamp block, gate, thumbwheel screws 4a/4b, pressure pad.
+Parts: cradle (with the tube U-channel built into its roof), gate, thumbwheel screw 4a, pressure pad.
 Every part is a base mesh plus live Boolean modifiers whose helper objects are parented
 to it; modifiers are only applied on the throwaway copies written to STL.
 
 Frames: cradle frame = world (floor center at origin, Mac front faces -Y, side wall on +X).
-The connector sits on the roof (the Mac's square face), so the clamp stacks on the Mac
-instead of beside it. Horizontal tube: Mac hangs under it. Vertical tube: Mac stands on its
-side wall with the roof against the tube.
-Connector geometry is drawn as if on the +X wall and moved onto the roof by M_CONN.
-Block frame: tenon points -X into the socket, tube axis along local Y, the U opens +X.
+The tube lies front-to-back directly on the roof (the Mac's square face) in a U-channel that
+opens toward +X; the gate closes it and 4a's wheel sits off the +X side. Horizontal tube: the
+Mac hangs under it. Vertical tube: the Mac hangs front-up, back-panel cables pointing down.
+U frame: the channel profile drawn in the old clamp-block frame (U opens +X, tube along Y),
+placed on the roof by the pure translation M_U.
 Screw frame: wheel bottom at z=0, thread runs +Z toward the tip.
 """
 import bpy, bmesh, math, os, sys
@@ -39,20 +39,17 @@ FOOT_R = 56.0                     # floor cutout radius (vented foot)
 LIP = 4.0                         # open-side retaining lips
 HOOK = 3.5                        # snap hook depth below the roof
 TONGUE_W, TONGUE_L, TONGUE_T, SLOT = 20.0, 30.0, 2.4, 2.0
-TONGUE_X = -42.0                  # snap tongue center, off to the side of the roof boss
+TONGUE_X = -42.0                  # snap tongue center, clear of the U-channel
 RELIEF_R = 1.5                    # inside-corner relief channels
 NOTCH = (-70.0, -40.0, 40.0, 70.0)  # power-button notch x0, x1, y0, y1 (rear-left)
-TENON = 20.0                      # tenon square side (printed as a 45-degree diamond)
-FIT = 0.3                         # sliding fits: tenon/socket, gate/dovetail
-SOCK_D = 30.0                     # socket depth
-BOSS_WALL, BOSS_TOP = 5.0, 12.0   # boss walls; wall above the socket that carries 4b's thread
-B_BASE = 14.0                     # clamp block base thickness (keeps tube clear of 4b's wheel)
-U_IN = 26.2                       # U inside width
+FIT = 0.3                         # sliding fit: gate/dovetail
+B_BASE = 5.0                      # U back wall
+U_IN = 26.2                       # U inside width (roof to cap)
 U_EXTRA = 12.0                    # extra U depth for the pad + screw tip
-U_WALL, U_LEN = 5.0, 60.0
-GATE_T = 10.0                     # gate thickness = thread engagement
+U_WALL = 5.0                      # U cap and floor thickness
+PLINTH = 2.0                      # U floor raised above the roof so the dovetail groove leaves roof under it
+GATE_T, GATE_L = 10.0, 60.0       # gate thickness (= thread engagement) and length
 DOVE = 2.3                        # dovetail tongue reach into each flange
-ZIP = (3.0, 6.0)                  # zip-tie slot x (across) and y (along tube)
 CHAMF = 2.0                       # stress-corner chamfers
 # threads: 16 mm, 2 mm pitch, printable buttress-style triangle (lower flank < 45 deg)
 PITCH, R_MAJ, R_CORE, R_BASE = 2.0, 8.0, 6.7, 6.5
@@ -64,7 +61,7 @@ PHASE = 0.0137                    # keeps helix vertices off part faces
 STEPS = 48                        # helix / lathe segments per turn
 LEAD = 1.0                        # thread lead-in chamfers
 WHEEL_R, WHEEL_T, KNURL = 20.0, 10.0, 30
-L_4A, L_4B, L_STUB = 24.0, 18.0, 15.0
+L_4A, L_STUB = 24.0, 15.0
 PAD = (40.0, 22.0, 4.0)           # along tube, across, thick
 PAD_BOSS_R, PAD_BOSS_H = 8.5, 6.0
 RES = 500
@@ -79,19 +76,12 @@ Z_RAIL = Z_FLOOR + RAIL_H
 Z_ROOF = Z_RAIL + MAC[2] + 2 * CL  # roof underside
 Z_TOP = Z_ROOF + WALL
 Y_FRONT, Y_BACK = -(IY + 4.0), IY + 3.0
-ZS = (Z_FLOOR + Z_ROOF) / 2       # socket axis height
-HS = (TENON + 2 * FIT) / math.sqrt(2)   # socket half-diagonal
-HT = TENON / math.sqrt(2)               # tenon half-diagonal
-X_SOCK0 = OX + 4.0                # socket bottom
-X_BOSS = X_SOCK0 + SOCK_D         # boss outer face
-Y_BOSS_TOP = HS + BOSS_TOP
-X_4B = X_BOSS - R_MAJ * K_INT - 2.65   # 4b axis: 2.65 mm wall to the boss face, wheel clears the plate
-Y_4B_TIP = HT + 0.2               # 4b tip just above the tenon's top edge
-G0 = B_BASE + U_IN + U_EXTRA      # gate inner face (block frame)
-FL_TIP = G0 + GATE_T + 2.0
-TUBE_X0 = B_BASE + 0.05           # tube face against the base
+G0 = B_BASE + U_IN + U_EXTRA      # gate inner face (U frame)
+FL_TIP = G0 + GATE_T + 2.0        # U flange tips
+TUBE_X0 = B_BASE + 0.05           # tube face against the back wall
 PAD_X0 = TUBE_X0 + TUBE + 0.05    # pad face against the tube
-BLOCK_X = X_BOSS + 0.05           # block frame origin in the cradle frame (shoulder seated on the boss)
+U_X = OX - FL_TIP                 # U frame origin: flange tips flush with the +X side wall
+U_Z = Z_TOP + PLINTH + U_IN / 2   # U frame origin height: channel floor PLINTH above the roof
 
 
 def link(o, coll=None):
@@ -266,24 +256,10 @@ def build_pad():
 
 
 # ---- frames ----
-Y_4B_W = Y_4B_TIP + 12 + L_4B                 # 4b wheel bottom (cradle y)
-X_4A_W = PAD_X0 + 4.3 + 12 + L_4A + 6.5        # 4a wheel bottom (block x); collar tip 0.3 above the socket floor
-# Connector frame: maps geometry drawn on the +X wall (socket axis +X at y=0, z=ZS) onto the
-# roof center (socket axis +Z). Y is unchanged, so print orientation and overhangs carry over.
-M_CONN = (Matrix.Translation((0, 0, Z_TOP)) @ Matrix(((0, 0, -1), (0, 1, 0), (1, 0, 0))).to_4x4()   # exact -90 about Y
-          @ Matrix.Translation((-OX, 0, -ZS)))   # exact entries: rotation noise makes the exact boolean leave slivers
-M_4B = M_CONN @ Matrix.Translation((X_4B, Y_4B_W, ZS)) @ Matrix.Rotation(math.radians(90), 4, "X")    # screw z -> -Y
+X_4A_W = PAD_X0 + 4.3 + 12 + L_4A + 6.5        # 4a wheel bottom (U x); collar tip 0.3 above the pad socket floor
+M_U = Matrix.Translation((U_X, 0, U_Z))        # U frame in the cradle frame (translation only: no rotation noise)
 M_4A = Matrix.Translation((X_4A_W, 0, 0)) @ Matrix.Rotation(math.radians(-90), 4, "Y")      # screw z -> -X
 M_PAD = Matrix.Translation((PAD_X0, 0, 0)) @ Matrix(((0, 0, 1), (1, 0, 0), (0, 1, 0))).to_4x4()
-
-
-def m_block(k):
-    """Block frame in the cradle frame; k quarter-turns about the tenon axis (0: tube front-to-back, 1: tube across)."""
-    return M_CONN @ Matrix.Translation((BLOCK_X, 0, ZS)) @ Matrix.Rotation(math.radians(90 * k), 4, "X")
-
-
-def diamond(h, zc=0.0):
-    return [(h, zc), (0, zc + h), (-h, zc), (0, zc - h)]
 
 
 def circle(cx, cy, r, n=24):
@@ -293,7 +269,7 @@ def circle(cx, cy, r, n=24):
 # ---- parts ----
 def build_cradle():
     """Open sleeve: floor, roof, side wall (+X). Front/back open, -X open between retaining lips.
-    The socket boss sits on the roof."""
+    The tube U-channel is built onto the roof."""
     c = CHAMF
     pts = [(-OX, c), (-OX + c, 0), (OX - c, 0), (OX, c), (OX, Z_TOP - c), (OX - c, Z_TOP),
            (-OX + c, Z_TOP), (-OX, Z_TOP - c), (-OX, Z_ROOF - LIP), (-IX, Z_ROOF - LIP), (-IX, Z_ROOF),
@@ -311,12 +287,21 @@ def build_cradle():
     y0 = IY - 1.6
     add(prism("back_lip", [(y0, Z_ROOF + 0.4), (Y_BACK, Z_ROOF + 0.4 - (Y_BACK - y0)), (Y_BACK, Z_ROOF + 0.4)],
               "X", -IX - 0.4, IX + 0.4))
-    # socket boss on the roof, underside at 45 degrees so it prints front-face-down without support
-    yb = -HS - BOSS_WALL
-    boss = prism("boss", [(OX - 0.4, yb - (X_BOSS - OX + 0.4)), (X_BOSS, yb), (X_BOSS, Y_BOSS_TOP), (OX - 0.4, Y_BOSS_TOP)],
-                 "Z", ZS - HS - BOSS_WALL, ZS + HS + BOSS_WALL)
-    boss.matrix_world = M_CONN
-    add(boss)
+    # tube U-channel on the roof, full cradle depth, opening toward +X; extruded along Y so it
+    # prints front-face-down like the rest of the sleeve. Floor corners stay square: they merge into the roof.
+    c, h, o = CHAMF, U_IN / 2, U_IN / 2 + U_WALL
+    u = prism("u_channel", [(0, -o), (FL_TIP, -o), (FL_TIP, -h), (B_BASE + c, -h), (B_BASE, -h + c),
+                            (B_BASE, h - c), (B_BASE + c, h), (FL_TIP, h), (FL_TIP, o - c), (FL_TIP - c, o),
+                            (c, o), (0, o - c)], "Y", Y_FRONT, Y_BACK)
+    u.matrix_world = M_U
+    add(u)
+    k = G0 + 6 - (h - FIT) + FIT * math.sqrt(2)          # x - z of the offset dovetail flank
+    zi, zo = h - 0.6, h - FIT + DOVE + FIT
+    for s in (1, -1):
+        g = [(G0 - FIT, zi), (G0 - FIT, zo), (zo + k, zo), (zi + k, zi)]
+        groove = prism(f"groove{s:+d}", [(x, s * z) for x, z in g], "Y", Y_FRONT - 1, Y_BACK + 1)
+        groove.matrix_world = M_U
+        cut(groove)
     arc = [(FOOT_R * math.cos(-math.pi * i / 24), FOOT_R * math.sin(-math.pi * i / 24)) for i in range(25)]
     cut(prism("foot_cutout", arc + [(-FOOT_R, Y_BACK + 2), (FOOT_R, Y_BACK + 2)], "Z", -1, Z_FLOOR + 0.5))
     x0, x1, y0, y1 = NOTCH
@@ -330,34 +315,7 @@ def build_cradle():
     zt, yr = Z_ROOF + TONGUE_T, Y_FRONT + TONGUE_L
     cut(prism("tongue_thin", [(Y_FRONT - 1, zt), (yr, zt), (yr + Z_TOP + 1 - zt, Z_TOP + 1), (Y_FRONT - 1, Z_TOP + 1)],
               "X", TONGUE_X - TONGUE_W / 2 - SLOT / 2, TONGUE_X + TONGUE_W / 2 + SLOT / 2))
-    sock = prism("socket", diamond(HS, ZS), "X", X_SOCK0, X_BOSS + 1)
-    sock.matrix_world = M_CONN
-    cut(sock)
-    hole = thread_cutter("cradle_4b_hole", Y_4B_W - Y_BOSS_TOP, Y_4B_W - 8.0, blind=True)
-    hole.matrix_world = M_4B
-    cut(hole)
     return cr
-
-
-def build_block():
-    """Clamp block: diamond tenon, U-channel with dovetail grooves and zip-tie slots."""
-    c, h, o = CHAMF, U_IN / 2, U_IN / 2 + U_WALL
-    pts = [(c, -o), (FL_TIP - c, -o), (FL_TIP, -o + c), (FL_TIP, -h), (B_BASE + c, -h), (B_BASE, -h + c),
-           (B_BASE, h - c), (B_BASE + c, h), (FL_TIP, h), (FL_TIP, o - c), (FL_TIP - c, o), (c, o), (0, o - c), (0, -o + c)]
-    bl = prism("clamp_block", pts, "Y", -U_LEN / 2, U_LEN / 2)
-    helper(prism("tenon", diamond(HT), "X", -(SOCK_D - 0.5), 0.5), bl, "add")
-    k = G0 + 6 - (h - FIT) + FIT * math.sqrt(2)          # x - z of the offset dovetail flank
-    zi, zo = h - 0.6, h - FIT + DOVE + FIT
-    for s in (1, -1):
-        g = [(G0 - FIT, zi), (G0 - FIT, zo), (zo + k, zo), (zi + k, zi)]
-        helper(prism(f"groove{s:+d}", [(x, s * z) for x, z in g], "Y", -U_LEN / 2 - 1, U_LEN / 2 + 1), bl)
-    xc = (TUBE_X0 + TUBE + G0) / 2
-    a, b = ZIP[0] / 2, ZIP[1] / 2
-    for s in (1, -1):
-        yc = s * (U_LEN / 2 - b - 2.5)
-        hexa = [(xc - a, yc - b + a), (xc, yc - b), (xc + a, yc - b + a), (xc + a, yc + b - a), (xc, yc + b), (xc - a, yc + b - a)]
-        helper(prism(f"zip{s:+d}", hexa, "Z", -o - 1, o + 1), bl)
-    return bl
 
 
 def build_gate():
@@ -365,7 +323,7 @@ def build_gate():
     t, d, w = U_IN / 2 - FIT, DOVE, 6.0
     pts = [(G0, -t - d), (G0 + w + d, -t - d), (G0 + w, -t), (G0 + GATE_T, -t),
            (G0 + GATE_T, t), (G0 + w, t), (G0 + w + d, t + d), (G0, t + d)]
-    ga = prism("gate", pts, "Y", -U_LEN / 2, U_LEN / 2)
+    ga = prism("gate", pts, "Y", -GATE_L / 2, GATE_L / 2)
     hole = thread_cutter("gate_hole", X_4A_W - (G0 + GATE_T), X_4A_W - G0)
     hole.matrix_world = M_4A
     helper(hole, ga)
@@ -425,11 +383,10 @@ def main():
     us = bpy.context.scene.unit_settings
     us.system, us.scale_length, us.length_unit = "METRIC", 0.001, "MILLIMETERS"
 
-    P = {"cradle": build_cradle(), "clamp_block": build_block(), "gate": build_gate(),
-         "screw_4a": build_screw("screw_4a", L_4A, True), "screw_4b": build_screw("screw_4b", L_4B, False),
-         "pad": build_pad()}
-    colors = {"cradle": (0.85, 0.45, 0.1), "clamp_block": (0.1, 0.35, 0.8), "gate": (0.15, 0.6, 0.3),
-              "screw_4a": (0.9, 0.75, 0.1), "screw_4b": (0.9, 0.75, 0.1), "pad": (0.6, 0.2, 0.6)}
+    P = {"cradle": build_cradle(), "gate": build_gate(),
+         "screw_4a": build_screw("screw_4a", L_4A, True), "pad": build_pad()}
+    colors = {"cradle": (0.85, 0.45, 0.1), "gate": (0.15, 0.6, 0.3),
+              "screw_4a": (0.9, 0.75, 0.1), "pad": (0.6, 0.2, 0.6)}
     for n, o in P.items():
         o.data.materials.append(material("PETG " + n, colors[n]))
 
@@ -444,52 +401,50 @@ def main():
     stub = build_screw("screw_stub", L_STUB, False)
     stub.data.materials.append(P["screw_4a"].data.materials[0])
     t_gate = prism("test_gate_slice", [(G0 - 1, -20), (G0 + GATE_T + 1, -20), (G0 + GATE_T + 1, 20), (G0 - 1, 20)], "Y", -12, 12)
-    t_ublk = prism("test_u_slice", [(-0.5, -25), (FL_TIP + 1, -25), (FL_TIP + 1, 25), (-0.5, 25)], "Y", -5, 5)
-    t_ugat = prism("test_u_gate_slice", [(G0 - 1, -20), (G0 + GATE_T + 1, -20), (G0 + GATE_T + 1, 20), (G0 - 1, 20)], "Y", -5, 5)
-    for t, src in ((t_gate, P["gate"]), (t_ublk, P["clamp_block"]), (t_ugat, P["gate"])):
+    zt = U_Z + U_IN / 2 + U_WALL + 1
+    t_ublk = prism("test_u_slice", [(U_X - 0.5, Z_ROOF - 2), (OX + 1, Z_ROOF - 2), (OX + 1, zt), (U_X - 0.5, zt)], "Y", -5, 5)
+    # gate slice for the tube coupon comes from beyond the threaded hole: a flat cut through the helix trips the exact boolean
+    t_ugat = prism("test_u_gate_slice", [(G0 - 1, -20), (G0 + GATE_T + 1, -20), (G0 + GATE_T + 1, 20), (G0 - 1, 20)], "Y", 12, 22)
+    for t, src in ((t_gate, P["gate"]), (t_ublk, P["cradle"]), (t_ugat, P["gate"])):
         boolean(t, "INTERSECT", src)
         t.parent, t.hide_render = src, True
 
     def pose(mode):
-        # horizontal: tube front-to-back above the roof, Mac hangs below.
-        # vertical: tube across the roof, whole assembly turned so the Mac stands on its side wall.
-        k = 1 if mode == "vertical" else 0
-        W = Matrix.Rotation(math.radians(90), 4, "Y") if mode == "vertical" else Matrix()
-        mb = W @ m_block(k)
+        # horizontal: tube front-to-back on the roof, Mac hangs below.
+        # vertical: whole assembly turned (exact -90 about X) so the tube is vertical and the Mac hangs front-up.
+        W = Matrix(((1, 0, 0), (0, 0, 1), (0, -1, 0))).to_4x4() if mode == "vertical" else Matrix()
+        mu = W @ M_U
         ex = mode == "exploded"
         off = lambda x=0, y=0, z=0: Matrix.Translation((x, y, z) if ex else (0, 0, 0))
         P["cradle"].matrix_world = W
-        P["clamp_block"].matrix_world = mb @ off(60)          # exploded offsets along the tenon axis
-        P["gate"].matrix_world = mb @ off(130)
-        P["pad"].matrix_world = mb @ off(95, 0, 70) @ M_PAD
-        P["screw_4a"].matrix_world = mb @ off(190) @ M_4A
-        P["screw_4b"].matrix_world = W @ off(0, 50) @ M_4B
+        P["gate"].matrix_world = mu @ off(45)                 # exploded offsets out of the U's open side
+        P["pad"].matrix_world = mu @ off(30, 0, 45) @ M_PAD
+        P["screw_4a"].matrix_world = mu @ off(95) @ M_4A
         mac.matrix_world = W @ off(0, -170)
         tube.hide_render = ex
-        tube.matrix_world = mb @ Matrix.Translation((TUBE_X0 + TUBE / 2, 0, 0)) @ Matrix.Rotation(math.radians(-90), 4, "X")
+        tube.matrix_world = mu @ Matrix.Translation((TUBE_X0 + TUBE / 2, 0, 0)) @ Matrix.Rotation(math.radians(-90), 4, "X")
         bpy.context.view_layer.update()
 
     # ---- fits, measured on the posed evaluated meshes ----
     print("\n== fits (triangle intersections, min gap mm) ==")
-    pairs = [("cradle", "clamp_block"), ("clamp_block", "gate"), ("gate", "screw_4a"), ("cradle", "screw_4b"),
-             ("pad", "screw_4a"), ("clamp_block", "screw_4b"), ("clamp_block", "pad"), ("gate", "pad")]
+    pairs = [("cradle", "gate"), ("gate", "screw_4a"), ("pad", "screw_4a"), ("cradle", "pad"),
+             ("gate", "pad"), ("cradle", "screw_4a")]
     for mode in ("horizontal", "vertical"):
         pose(mode)
         objs = dict(P, mac=mac, tube=tube)
-        for a, b in pairs + [("mac", "cradle"), ("tube", "clamp_block"), ("tube", "pad"), ("tube", "gate"),
-                             ("tube", "screw_4b"), ("tube", "cradle")]:
+        for a, b in pairs + [("mac", "cradle"), ("tube", "cradle"), ("tube", "pad"), ("tube", "gate"),
+                             ("tube", "screw_4a")]:
             hits, d = gap(objs[a], objs[b])
             print(f"  {mode:10s} {a:12s} / {b:12s} hits {hits:4d}  gap {d:6.3f}")
 
     # ---- export, print-oriented on z=0 ----
     print("\n== print checks ==")
     R = lambda deg, ax: Matrix.Rotation(math.radians(deg), 4, ax)
-    orient = {"cradle": (R(90, "X"), "front face down"), "clamp_block": (R(90, "X"), "U end down, tube axis up"),
-              "gate": (R(-90, "Y"), "inner face down"), "screw_4a": (Matrix(), "wheel down"),
-              "screw_4b": (Matrix(), "wheel down"), "pad": (Matrix(), "grip face down")}
+    orient = {"cradle": (R(90, "X"), "front face down"), "gate": (R(-90, "Y"), "inner face down"),
+              "screw_4a": (Matrix(), "wheel down"), "pad": (Matrix(), "grip face down")}
     jobs = [(n, [(P[n], orient[n][0])], orient[n][1]) for n in P]
     jobs += [("test_thread", [(t_gate, R(-90, "Y")), (stub, Matrix())], "gate slice inner face down + stub wheel down"),
-             ("test_tube", [(t_ublk, R(90, "X")), (t_ugat, R(-90, "Y"))], "U slice flat + gate slice inner face down")]
+             ("test_tube", [(t_ublk, R(90, "X")), (t_ugat, R(-90, "Y"))], "U slice front-face-down + gate slice inner face down")]
     table = []
     for name, items, how in jobs:
         bm, x = bmesh.new(), 0.0
@@ -547,7 +502,7 @@ def main():
         shoot(pdir, n, [o])
     for v in visible:
         v.hide_render = False
-    montage(pdir, list(P), os.path.join(RDIR, "parts_sheet.png"))
+    montage(pdir, list(P), os.path.join(RDIR, "parts_sheet.png"), cols=2)
 
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "macmini_mount.blend"))
 
