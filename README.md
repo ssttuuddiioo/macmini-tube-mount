@@ -19,6 +19,10 @@ The STLs in `out/macmini/stl/` are already in print orientation, sitting on Z = 
 | `screw_4a.stl` | yellow | wheel down |
 | `pad.stl` | purple | grip face down |
 
+Or open the ready-made plates in `out/macmini/plates/`. Each object's name lists the settings to give it (for example "screw_4a - 100% infill"):
+- `plate1_test_pieces.3mf`: both test pieces.
+- `plate2_parts.3mf`: all four parts, laid out on one 256 mm bed.
+
 Print `test_thread.stl` and `test_tube.stl` first. They're small coupons that check the thread fit and the tube/gate fit on your printer before you commit to the big parts.
 
 ## Assemble

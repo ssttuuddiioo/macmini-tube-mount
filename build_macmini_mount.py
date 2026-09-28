@@ -25,6 +25,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(ROOT, "out")
 RDIR = os.path.join(OUT, "macmini")
 SDIR = os.path.join(RDIR, "stl")
+PDIR = os.path.join(RDIR, "plates")
 
 # ---- params (mm) ----
 MAC = (127.0, 127.0, 50.0)        # Mac mini W x D x H
@@ -376,6 +377,65 @@ def print_check(bm):
     return bad, bed, over, span
 
 
+# ---- plate files ----
+BED, BED_MARGIN, GAP = 256.0, 5.0, 10.0
+# (source object, name shown in the slicer with its per-part settings, front-left corner on the bed)
+PLATES = {
+    "plate1_test_pieces": [
+        ("test_gate_slice", "test gate thread - 100% infill", (20, 108)),
+        ("screw_stub", "test screw stub - 100% infill", (65, 108)),
+        ("test_u_slice", "test channel slice - 4 walls 35% infill", (120, 108)),
+        ("test_u_gate_slice", "test gate slice - 100% infill", (195, 108)),
+    ],
+    "plate2_parts": [
+        ("cradle", "cradle - 4 walls 35% infill, brim", (15, 15)),
+        ("screw_4a", "screw_4a - 100% infill", (170, 15)),
+        ("gate", "gate - 100% infill", (170, 70)),
+        ("pad", "pad - 100% infill", (15, 130)),
+    ],
+}
+
+
+def write_3mf(path, placed):
+    """Minimal core-spec 3MF: one object per part, each placed on the bed by its build item.
+    placed: (label, (verts, tris, size), (x, y) front-left corner). Checks the layout first."""
+    import zipfile
+    from xml.sax.saxutils import quoteattr
+    boxes = []
+    for label, (_, _, size), (x, y) in placed:
+        assert x >= BED_MARGIN and y >= BED_MARGIN and x + size.x <= BED - BED_MARGIN and y + size.y <= BED - BED_MARGIN, \
+            f"{label} leaves the bed"
+        assert size.z <= BED, f"{label} too tall"
+        for l2, (x2, y2, w2, d2) in boxes:
+            assert x + size.x + GAP <= x2 or x2 + w2 + GAP <= x or y + size.y + GAP <= y2 or y2 + d2 + GAP <= y, \
+                f"{label} is within {GAP} mm of {l2}"
+        boxes.append((label, (x, y, size.x, size.y)))
+    res, build = [], []
+    for i, (label, (verts, tris, _), (x, y)) in enumerate(placed, 1):
+        vx = "".join(f'<vertex x="{a:.4f}" y="{b:.4f}" z="{c:.4f}"/>' for a, b, c in verts)
+        tr = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in tris)
+        res.append(f'<object id="{i}" type="model" name={quoteattr(label)}><mesh><vertices>{vx}</vertices>'
+                   f'<triangles>{tr}</triangles></mesh></object>')
+        build.append(f'<item objectid="{i}" transform="1 0 0 0 1 0 0 0 1 {x:.3f} {y:.3f} 0"/>')
+    model = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+             '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">'
+             f'<resources>{"".join(res)}</resources><build>{"".join(build)}</build></model>')
+    types = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+             '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+             '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+             '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>')
+    rels = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Target="/3D/3dmodel.model" Id="rel0" '
+            'Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>')
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", types)
+        z.writestr("_rels/.rels", rels)
+        z.writestr("3D/3dmodel.model", model)
+    print(f"  {os.path.basename(path)}: " + ", ".join(label.split(" - ")[0] for label, _, _ in placed))
+
+
 # ---- scene ----
 def main():
     new_scene()
@@ -445,13 +505,18 @@ def main():
     jobs = [(n, [(P[n], orient[n][0])], orient[n][1]) for n in P]
     jobs += [("test_thread", [(t_gate, R(-90, "Y")), (stub, Matrix())], "gate slice inner face down + stub wheel down"),
              ("test_tube", [(t_ublk, R(90, "X")), (t_ugat, R(-90, "Y"))], "U slice front-face-down + gate slice inner face down")]
-    table = []
+    table, bodies = [], {}
     for name, items, how in jobs:
         bm, x = bmesh.new(), 0.0
         for o, m in items:
             b = eval_bm(o, m)                          # object-local mesh -> print orientation
             lo = Vector([min(v.co[i] for v in b.verts) for i in range(3)])
             hi = Vector([max(v.co[i] for v in b.verts) for i in range(3)])
+            t = b.copy()                               # triangulated copy, min corner at 0, for the plate files
+            bmesh.ops.triangulate(t, faces=t.faces)
+            t.verts.index_update()
+            bodies[o.name] = ([tuple(v.co - lo) for v in t.verts], [tuple(v.index for v in f.verts) for f in t.faces], hi - lo)
+            t.free()
             bmesh.ops.translate(b, vec=(x - lo.x, -(lo.y + hi.y) / 2, -lo.z), verts=b.verts)
             x += hi.x - lo.x + 10
             me = bpy.data.meshes.new("tmp")
@@ -470,6 +535,11 @@ def main():
         table.append((name, dims, how))
         fits = all(d <= 256 for d in dims)
         print(f"  {name:12s} nonmanifold {bad:3d}  bed {bed:7.0f} mm2  overhang {over:6.1f} mm2  bridge {span:5.1f}  fits P1S {fits}")
+
+    # ---- plate files: one .3mf per print, parts laid out on the P1S bed ----
+    print("\n== plates ==")
+    for plate, placed in PLATES.items():
+        write_3mf(os.path.join(PDIR, plate + ".3mf"), [(label, bodies[src], xy) for src, label, xy in placed])
 
     # ---- renders ----
     for o in (t_gate, t_ublk, t_ugat, stub):
