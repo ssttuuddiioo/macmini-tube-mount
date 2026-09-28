@@ -6,7 +6,12 @@ Script: `build_macmini_mount.py`. Units: 1 BU = 1 mm. Outputs: `out/macmini_moun
 ## Choices
 
 **Layout**
-- Cradle frame: floor center at origin, Mac front faces -Y, plate on +X.
+- Cradle frame: floor center at origin, Mac front faces -Y, solid side wall on +X.
+- The connector (socket boss) sits in the middle of the roof, the Mac's square face, so the clamp stacks on the Mac instead of sitting beside it.
+  - Horizontal tube: the Mac hangs under it.
+  - Vertical tube: the Mac stands on its solid side wall with its roof against the tube.
+  - The block's four quarter-turns choose whether the tube runs front-to-back or across the Mac.
+- The boss, socket and 4b hole are drawn as if on the side wall, then moved onto the roof with one exact transform (`M_CONN`). Their geometry, fits and print behaviour are unchanged, and Y stays print-up.
 - The Mac slides in from the front. The -X side stays open between 4 mm retaining lips on the floor and roof, which keeps the power notch reachable.
 - Inside is Mac + 0.6 mm per side. The Mac rests on two 3 mm rails along the side strips, so its bottom sits 7 mm above the bed face.
 - Mac placeholder: 12 mm corner radius. Tube placeholder: 3 mm corner radius. Neither is exported.
@@ -15,17 +20,17 @@ Script: `build_macmini_mount.py`. Units: 1 BU = 1 mm. Outputs: `out/macmini_moun
 - Floor cutout: a 112 mm circle under the foot, opened straight back to the rear edge. With the cradle printed front-face-down, the hole then has no ceiling to bridge. Underside and back stay open.
 - Power notch: 30 × 30 mm at rear-left (-X, +Y, seen from the front). It cuts through the floor, rail and lip.
 - Retention:
-  - Front: a 20 × 30 mm flex tongue in the roof, thinned to 2.4 mm. Its hook is 3.5 mm deep, with a 41° entry ramp and a square catch 0.6 mm ahead of the Mac face. Deflection is about 2.3 mm, roughly 0.9 % strain.
+  - Front: a 20 × 30 mm flex tongue in the roof, thinned to 2.4 mm. It sits off-center (x = -42) to clear the boss footprint. Its hook is 3.5 mm deep, with a 41° entry ramp and a square catch 0.6 mm ahead of the Mac face. Deflection is about 2.3 mm, roughly 0.9 % strain.
   - Back: a 45° roof lip that meets the Mac's top-back edge with 0.6 mm clearance.
 - Inside corners have 1.5 mm relief channels. Outer long edges have 2 mm chamfers.
 
 **Socket and tenon**
 - Printed as a 45° diamond (the square rotated 45°), so both the socket ceiling and the tenon's underside are 45° with no bridges. Four-way indexing is kept.
 - Tenon is 20 mm square and 29.5 mm long. Socket is 20.6 mm and 30 mm deep, giving 0.3 mm per side.
-- The boss is 34 mm deep. That lets lock screw 4b sit far enough out that its 40 mm wheel clears the plate.
+- The boss is 34 mm deep. That lets lock screw 4b sit far enough out that its 40 mm wheel clears the roof.
 
 **Lock screw 4b**
-- Threads into the top (+Y) face of the boss, so the hole is vertical in print.
+- Threads into the rear (+Y) face of the boss, so the hole is vertical in print.
 - Its tip presses the tenon's top edge, wedging the tenon into the socket's lower V.
 
 **Clamp block and gate**
@@ -71,5 +76,5 @@ Script: `build_macmini_mount.py`. Units: 1 BU = 1 mm. Outputs: `out/macmini_moun
   - Top edge radius small enough for the 3.5 mm hook to catch.
 - No elephant-foot chamfer on the cradle's front (bed) edges or the pad's face edges.
 - The tenon root and the boss-to-plate top junction have no fillet. Both are stress corners that I left square to keep the tenon's shoulder seat flat.
-- Plate and boss strength under 0.7 kg on a cantilever hasn't been analyzed. The plate is 4 mm, and the boss spreads the load over 64 mm of it.
+- Strength under 0.7 kg hasn't been analyzed. The load runs floor -> 4 mm side wall -> 4 mm roof -> boss, and the -X side is open. A rough hand estimate for the floor cantilever gives about 1.2 MPa, far below PETG's ~50 MPa, but the C-frame hasn't been simulated.
 - The tongue-slot tops are 2 mm bridges. These are the only overhangs the checker reports, and they're within the 20 mm limit.

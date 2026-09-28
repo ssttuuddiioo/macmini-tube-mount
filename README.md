@@ -1,6 +1,10 @@
 # Mac mini tube mount
 
-A 3D-printable enclosure that clamps a Mac mini (127 × 127 × 50 mm) to a 1" (25.4 mm) square tube. The tube can run vertical or horizontal. Every part is printed in PETG, with no metal hardware and no supports.
+A 3D-printable enclosure that clamps a Mac mini (127 × 127 × 50 mm) to a 1" (25.4 mm) square tube. The clamp mounts on the Mac's square top face to keep it compact:
+- **Horizontal tube:** the Mac hangs underneath.
+- **Vertical tube:** the Mac stands on edge, flat against the tube.
+
+Every part is printed in PETG, with no metal hardware and no supports.
 
 ![On a vertical tube](out/macmini/vertical_tube.png)
 
@@ -21,7 +25,7 @@ Print `test_thread.stl` and `test_tube.stl` first. They're small coupons that ch
 ## Assemble
 
 1. Slide the Mac into the cradle from the front until the roof tab clicks over its front edge. The back lip stops it at the rear.
-2. Push the clamp block's diamond tenon into the socket on the side plate. Turn the block a quarter-turn at a time to pick vertical or horizontal tube. Tighten lock screw 4b down onto the tenon from the top of the boss.
+2. Push the clamp block's diamond tenon into the socket on the cradle's roof. The block fits in four quarter-turns, which pick whether the tube runs front-to-back or across the Mac. Tighten lock screw 4b onto the tenon from the rear of the boss.
 3. Snap the pad onto the tip of screw 4a, then thread 4a into the gate.
 4. Drop the tube into the U, slide the gate into its dovetail grooves, and tighten 4a until the pad grips the tube. Add zip ties through the slots for backup.
 

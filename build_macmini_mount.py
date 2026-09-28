@@ -5,8 +5,12 @@ Parts: cradle (+ plate), clamp block, gate, thumbwheel screws 4a/4b, pressure pa
 Every part is a base mesh plus live Boolean modifiers whose helper objects are parented
 to it; modifiers are only applied on the throwaway copies written to STL.
 
-Frames: cradle frame = world (floor center at origin, Mac front faces -Y, plate on +X).
-Block frame: tenon points -X into the plate socket, tube axis along local Y, the U opens +X.
+Frames: cradle frame = world (floor center at origin, Mac front faces -Y, side wall on +X).
+The connector sits on the roof (the Mac's square face), so the clamp stacks on the Mac
+instead of beside it. Horizontal tube: Mac hangs under it. Vertical tube: Mac stands on its
+side wall with the roof against the tube.
+Connector geometry is drawn as if on the +X wall and moved onto the roof by M_CONN.
+Block frame: tenon points -X into the socket, tube axis along local Y, the U opens +X.
 Screw frame: wheel bottom at z=0, thread runs +Z toward the tip.
 """
 import bpy, bmesh, math, os, sys
@@ -35,6 +39,7 @@ FOOT_R = 56.0                     # floor cutout radius (vented foot)
 LIP = 4.0                         # open-side retaining lips
 HOOK = 3.5                        # snap hook depth below the roof
 TONGUE_W, TONGUE_L, TONGUE_T, SLOT = 20.0, 30.0, 2.4, 2.0
+TONGUE_X = -42.0                  # snap tongue center, off to the side of the roof boss
 RELIEF_R = 1.5                    # inside-corner relief channels
 NOTCH = (-70.0, -40.0, 40.0, 70.0)  # power-button notch x0, x1, y0, y1 (rear-left)
 TENON = 20.0                      # tenon square side (printed as a 45-degree diamond)
@@ -263,14 +268,18 @@ def build_pad():
 # ---- frames ----
 Y_4B_W = Y_4B_TIP + 12 + L_4B                 # 4b wheel bottom (cradle y)
 X_4A_W = PAD_X0 + 4.3 + 12 + L_4A + 6.5        # 4a wheel bottom (block x); collar tip 0.3 above the socket floor
-M_4B = Matrix.Translation((X_4B, Y_4B_W, ZS)) @ Matrix.Rotation(math.radians(90), 4, "X")    # screw z -> -Y
+# Connector frame: maps geometry drawn on the +X wall (socket axis +X at y=0, z=ZS) onto the
+# roof center (socket axis +Z). Y is unchanged, so print orientation and overhangs carry over.
+M_CONN = (Matrix.Translation((0, 0, Z_TOP)) @ Matrix(((0, 0, -1), (0, 1, 0), (1, 0, 0))).to_4x4()   # exact -90 about Y
+          @ Matrix.Translation((-OX, 0, -ZS)))   # exact entries: rotation noise makes the exact boolean leave slivers
+M_4B = M_CONN @ Matrix.Translation((X_4B, Y_4B_W, ZS)) @ Matrix.Rotation(math.radians(90), 4, "X")    # screw z -> -Y
 M_4A = Matrix.Translation((X_4A_W, 0, 0)) @ Matrix.Rotation(math.radians(-90), 4, "Y")      # screw z -> -X
 M_PAD = Matrix.Translation((PAD_X0, 0, 0)) @ Matrix(((0, 0, 1), (1, 0, 0), (0, 1, 0))).to_4x4()
 
 
 def m_block(k):
-    """Block frame in the cradle frame; k quarter-turns about the tenon axis (0: tube along Y, 1: tube vertical)."""
-    return Matrix.Translation((BLOCK_X, 0, ZS)) @ Matrix.Rotation(math.radians(90 * k), 4, "X")
+    """Block frame in the cradle frame; k quarter-turns about the tenon axis (0: tube front-to-back, 1: tube across)."""
+    return M_CONN @ Matrix.Translation((BLOCK_X, 0, ZS)) @ Matrix.Rotation(math.radians(90 * k), 4, "X")
 
 
 def diamond(h, zc=0.0):
@@ -283,7 +292,8 @@ def circle(cx, cy, r, n=24):
 
 # ---- parts ----
 def build_cradle():
-    """Open sleeve: floor, roof, plate (+X). Front/back open, -X open between retaining lips."""
+    """Open sleeve: floor, roof, side wall (+X). Front/back open, -X open between retaining lips.
+    The socket boss sits on the roof."""
     c = CHAMF
     pts = [(-OX, c), (-OX + c, 0), (OX - c, 0), (OX, c), (OX, Z_TOP - c), (OX - c, Z_TOP),
            (-OX + c, Z_TOP), (-OX, Z_TOP - c), (-OX, Z_ROOF - LIP), (-IX, Z_ROOF - LIP), (-IX, Z_ROOF),
@@ -296,15 +306,17 @@ def build_cradle():
         add(prism(f"rail{s:+d}", [(x0, Z_FLOOR - 0.5), (x1, Z_FLOOR - 0.5), (x1, Z_RAIL), (x0, Z_RAIL)], "Y", Y_FRONT, Y_BACK))
     # snap hook under the tongue tip: 41-degree entry ramp, square catch face 0.6 mm ahead of the Mac
     add(prism("hook", [(Y_FRONT, Z_ROOF + 0.3), (Y_FRONT, Z_ROOF), (-IY, Z_ROOF - HOOK), (-IY, Z_ROOF + 0.3)],
-              "X", -TONGUE_W / 2 + 0.1, TONGUE_W / 2 - 0.1))
+              "X", TONGUE_X - TONGUE_W / 2 + 0.1, TONGUE_X + TONGUE_W / 2 - 0.1))
     # rear stop: 45-degree lip that meets the Mac's top-back edge with 0.6 mm clearance
     y0 = IY - 1.6
     add(prism("back_lip", [(y0, Z_ROOF + 0.4), (Y_BACK, Z_ROOF + 0.4 - (Y_BACK - y0)), (Y_BACK, Z_ROOF + 0.4)],
               "X", -IX - 0.4, IX + 0.4))
-    # socket boss, underside at 45 degrees so it prints front-face-down without support
+    # socket boss on the roof, underside at 45 degrees so it prints front-face-down without support
     yb = -HS - BOSS_WALL
-    add(prism("boss", [(OX - 0.4, yb - (X_BOSS - OX + 0.4)), (X_BOSS, yb), (X_BOSS, Y_BOSS_TOP), (OX - 0.4, Y_BOSS_TOP)],
-              "Z", ZS - HS - BOSS_WALL, ZS + HS + BOSS_WALL))
+    boss = prism("boss", [(OX - 0.4, yb - (X_BOSS - OX + 0.4)), (X_BOSS, yb), (X_BOSS, Y_BOSS_TOP), (OX - 0.4, Y_BOSS_TOP)],
+                 "Z", ZS - HS - BOSS_WALL, ZS + HS + BOSS_WALL)
+    boss.matrix_world = M_CONN
+    add(boss)
     arc = [(FOOT_R * math.cos(-math.pi * i / 24), FOOT_R * math.sin(-math.pi * i / 24)) for i in range(25)]
     cut(prism("foot_cutout", arc + [(-FOOT_R, Y_BACK + 2), (FOOT_R, Y_BACK + 2)], "Z", -1, Z_FLOOR + 0.5))
     x0, x1, y0, y1 = NOTCH
@@ -312,13 +324,15 @@ def build_cradle():
     for i, (x, z) in enumerate(((IX, Z_FLOOR), (IX, Z_ROOF), (-IX, Z_FLOOR), (-IX, Z_ROOF))):
         cut(prism(f"relief{i}", circle(x, z, RELIEF_R, 16), "Y", Y_FRONT - 1, Y_BACK + 1))
     for s in (1, -1):
-        x0, x1 = sorted((s * TONGUE_W / 2, s * (TONGUE_W / 2 + SLOT)))
+        x0, x1 = sorted((TONGUE_X + s * TONGUE_W / 2, TONGUE_X + s * (TONGUE_W / 2 + SLOT)))
         cut(prism(f"tongue_slot{s:+d}", [(x0, Y_FRONT - 1), (x1, Y_FRONT - 1), (x1, Y_FRONT + TONGUE_L), (x0, Y_FRONT + TONGUE_L)],
                   "Z", Z_ROOF - HOOK - 1, Z_TOP + 1))
     zt, yr = Z_ROOF + TONGUE_T, Y_FRONT + TONGUE_L
     cut(prism("tongue_thin", [(Y_FRONT - 1, zt), (yr, zt), (yr + Z_TOP + 1 - zt, Z_TOP + 1), (Y_FRONT - 1, Z_TOP + 1)],
-              "X", -TONGUE_W / 2 - SLOT / 2, TONGUE_W / 2 + SLOT / 2))
-    cut(prism("socket", diamond(HS, ZS), "X", X_SOCK0, X_BOSS + 1))
+              "X", TONGUE_X - TONGUE_W / 2 - SLOT / 2, TONGUE_X + TONGUE_W / 2 + SLOT / 2))
+    sock = prism("socket", diamond(HS, ZS), "X", X_SOCK0, X_BOSS + 1)
+    sock.matrix_world = M_CONN
+    cut(sock)
     hole = thread_cutter("cradle_4b_hole", Y_4B_W - Y_BOSS_TOP, Y_4B_W - 8.0, blind=True)
     hole.matrix_world = M_4B
     cut(hole)
@@ -437,20 +451,22 @@ def main():
         t.parent, t.hide_render = src, True
 
     def pose(mode):
+        # horizontal: tube front-to-back above the roof, Mac hangs below.
+        # vertical: tube across the roof, whole assembly turned so the Mac stands on its side wall.
         k = 1 if mode == "vertical" else 0
-        mb = m_block(k)
+        W = Matrix.Rotation(math.radians(90), 4, "Y") if mode == "vertical" else Matrix()
+        mb = W @ m_block(k)
         ex = mode == "exploded"
         off = lambda x=0, y=0, z=0: Matrix.Translation((x, y, z) if ex else (0, 0, 0))
-        P["cradle"].matrix_world = Matrix()
-        P["clamp_block"].matrix_world = off(60) @ mb
-        P["gate"].matrix_world = off(130) @ mb
-        P["pad"].matrix_world = off(95, 0, 70) @ mb @ M_PAD
-        P["screw_4a"].matrix_world = off(190) @ mb @ M_4A
-        P["screw_4b"].matrix_world = off(0, 50) @ M_4B
-        mac.matrix_world = off(0, -170)
+        P["cradle"].matrix_world = W
+        P["clamp_block"].matrix_world = mb @ off(60)          # exploded offsets along the tenon axis
+        P["gate"].matrix_world = mb @ off(130)
+        P["pad"].matrix_world = mb @ off(95, 0, 70) @ M_PAD
+        P["screw_4a"].matrix_world = mb @ off(190) @ M_4A
+        P["screw_4b"].matrix_world = W @ off(0, 50) @ M_4B
+        mac.matrix_world = W @ off(0, -170)
         tube.hide_render = ex
-        tc = mb @ Vector((TUBE_X0 + TUBE / 2, 0, 0))
-        tube.matrix_world = Matrix.Translation(tc) @ (Matrix.Rotation(math.radians(-90), 4, "X") if k == 0 else Matrix())
+        tube.matrix_world = mb @ Matrix.Translation((TUBE_X0 + TUBE / 2, 0, 0)) @ Matrix.Rotation(math.radians(-90), 4, "X")
         bpy.context.view_layer.update()
 
     # ---- fits, measured on the posed evaluated meshes ----
